@@ -28,7 +28,6 @@ func MonitorGPU() (int, []float64, []float64, error) {
 			continue
 		}
 		var index, used, total, util int
-		// Adjust the format string to match the output
 		_, err := fmt.Sscanf(string(line), "%d, %d, %d, %d", &index, &used, &total, &util)
 		if err != nil {
 			return 0, nil, nil, fmt.Errorf("failed to parse line: %s, error: %v", line, err)
@@ -51,35 +50,37 @@ func Consumer(wg *sync.WaitGroup) {
 			return
 		}
 
+		// 打印每个 GPU 的使用情况
 		for i := 0; i < gpuCount; i++ {
 			fmt.Printf("GPU %d - Memory Usage: %.2f%%, Utilization: %.2f%%\n", i, memoryUsage[i], utilization[i])
 		}
 
-		// Check if any GPU exceeds the thresholds
-		highUsage := false
+		// 计算总内存使用率和总 GPU 利用率
+		totalMemoryUsage := 0.0
+		totalUtilization := 0.0
 		for _, mem := range memoryUsage {
-			if mem > 80.0 { // Set your memory threshold
-				highUsage = true
-				break
-			}
+			totalMemoryUsage += mem
 		}
 		for _, util := range utilization {
-			if util > 80.0 { // Set your utilization threshold
-				highUsage = true
-				break
-			}
+			totalUtilization += util
 		}
+		averageMemoryUsage := totalMemoryUsage / float64(gpuCount)
+		averageUtilization := totalUtilization / float64(gpuCount)
 
-		if highUsage {
-			fmt.Println("GPU resources are high, waiting...")
-			time.Sleep(5 * time.Second) // Block and wait before checking again
+		// 根据总占用率判断是否延迟或停止消费
+		if averageMemoryUsage >= 70.0 || averageUtilization >= 70.0 {
+			fmt.Println("资源使用率过高，停止消费...")
+			time.Sleep(5000 * time.Second) // 暂停 5 秒
 			continue
+		} else if averageMemoryUsage >= 50.0 || averageUtilization >= 50.0 {
+			fmt.Println("资源使用率达到 50%，延迟消费...")
+			time.Sleep(2000 * time.Second) // 延迟消费 2 秒
 		}
 
-		// Simulate creating a container to execute the model
+		// 模拟创建容器来执行模型
 		fmt.Println("Creating container to execute model...")
-		// Here you would add your container creation logic
-		time.Sleep(2 * time.Second) // Simulate time taken to create a container
+		// 这里可以添加你的容器创建逻辑
+		time.Sleep(2000 * time.Second) // 模拟创建容器所需时间
 	}
 }
 
@@ -89,6 +90,6 @@ func main() {
 
 	go Consumer(&wg)
 
-	// Wait for the consumer goroutine to finish
+	// 等待消费者 goroutine 完成
 	wg.Wait()
 }
